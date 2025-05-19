@@ -6,9 +6,9 @@ library(ncdf4)
 
 
 # Events
-t_start <- c('2021-10-18 05:00:00', '2022-03-04 08:00:00', '2022-03-25 02:00:00', '2022-04-25 10:00:00')
-t_end   <- c('2021-10-18 19:00:00', '2022-03-04 22:00:00', '2022-03-26 10:00:00', '2022-04-28 22:00:00')
-names<-c("18102021.png", "04032022.png","25032022.png","26042022.png")
+t_start <- c('2025-02-04 18:00:00')
+t_end   <- c('2025-02-05 18:00:00')
+names<-c("04022025.png")
 
 #### Basemap
 map<-map_data("state")
@@ -31,8 +31,8 @@ for(i in 1 :length(t_start)){
   run_times<-gsub(" ","", run_times)
   run_times<-gsub(":","", run_times)
   run_times<-substr(run_times, 1, 12)
-  foots<-paste0("/uufs/chpc.utah.edu/common/home/lin-group19/KaiW/dust_SPL/out/footprints/",run_times, "_-106.744_40.455_5_foot.nc")
-  
+  foots<-paste0("/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_SPL/out/2025_trajectories/footprints/",run_times, "_-106.744_40.455_5_foot.nc")
+
   before_foots<-foots[1:4]
   after_foots<-foots[(length(foots) - 3) : length(foots)]
   foots<-foots[!( foots %in% c(before_foots, after_foots))]
@@ -107,7 +107,9 @@ for(i in 1 :length(t_start)){
   # Combine
   plot<-b+d+a
   
-  ggsave(names[i], width = 12, height = 4, unit = "in")
+  output_dir <- "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/scripts/figures"
+  ggsave(file.path(output_dir, names[i]), width = 12, height = 4, unit = "in")
+  
   gc()
 }
 
@@ -117,11 +119,11 @@ for(i in 1 :length(t_start)){
 
 
 
-q<-p+geom_point(aes(x = mean_lon, y = mean_lat, color = mean_zagl), trajs, size = 0.5)+
-  scale_color_gradientn(colors = c("red", "orange", "yellow", "green", "blue", "purple"), limits = c(0, 7000))+
-  geom_map(data = map, map = map, 
-           aes(long, lat, map_id = region),  
-           color = "black", fill = NA, size = 0.2)+lims( y = c(20,70), x = c(50, 310))+ coord_fixed(2)+labs(title = event)
-event<-gsub(" ", "_", event)
-filename<-paste0("/uufs/chpc.utah.edu/common/home/lin-group19/KaiW/mercury_SPL/figs/cropped_", event, ".png")
-ggsave(filename, height = 8, width = 12, units = "in")
+#q<-p+geom_point(aes(x = mean_lon, y = mean_lat, color = mean_zagl), trajs, size = 0.5)+
+#  scale_color_gradientn(colors = c("red", "orange", "yellow", "green", "blue", "purple"), limits = c(0, 7000))+
+#  geom_map(data = map, map = map, 
+#           aes(long, lat, map_id = region),  
+#           color = "black", fill = NA, size = 0.2)+lims( y = c(20,70), x = c(50, 310))+ coord_fixed(2)+labs(title = event)
+#event<-gsub(" ", "_", event)
+#filename<-paste0("/uufs/chpc.utah.edu/common/home/lin-group19/KaiW/mercury_SPL/figs/cropped_", event, ".png")
+#ggsave(filename, height = 8, width = 12, units = "in")
