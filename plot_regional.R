@@ -26,31 +26,20 @@ for(i in 1 :length(t_start)){
                    to   = as.POSIXct(t_end[i], tz = 'UTC'),
                    by   = 'hour')
   
-  run_times<-run_times + 7*3600
-  run_times<-gsub("-","", run_times)
-  run_times<-gsub(" ","", run_times)
-  run_times<-gsub(":","", run_times)
-  run_times<-substr(run_times, 1, 12)
-  foots<-paste0("/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_SPL/out/2025_trajectories/footprints/",run_times, "_-106.744_40.455_5_foot.nc")
+#  run_times<-run_times + 7*3600
+#  run_times<-gsub("-","", run_times)
+#  run_times<-gsub(" ","", run_times)
+#  run_times<-gsub(":","", run_times)
+#  run_times<-substr(run_times, 1, 12)
+  run_times <- format(run_times + 7*3600, "%Y%m%d%H%M")
+  foots<-paste0("/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories/footprints/",run_times, "_-106.744_40.455_5_foot.nc")
 
   before_foots<-foots[1:4]
   after_foots<-foots[(length(foots) - 3) : length(foots)]
   foots<-foots[!( foots %in% c(before_foots, after_foots))]
   
   
-  # Before
-  before<-NULL
-  for(i in before_foots){
-  part<-readRDS(particles)
-  save<-part$particle
-  part<-part$particle
-  
-  # Subset particles
-  part<-part[part$time %in% seq(-1, -14400, -60), ]
-  part<-part[part$indx %in% sample(1:1000, 200, replace = F), ]
-  part$zagl[part$zagl > 15000]<-15000
-  
-  }
+
   
   
   
