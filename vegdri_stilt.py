@@ -49,7 +49,7 @@ def compute_mean_within_regions(lon2d, lat2d, data2d, outlines, bbox):
 
 
 # ==== User Inputs ====
-percent_diff_nc = "/aridity_data/percent_change_CONUS.nc"
+percent_diff_nc = "aridity_data/percent_change_west.nc"
 outline_nc = "../2025_trajectories/footprint_outlines/04022025_outline.nc"
 output_plot = "figures/04022025_percent_change_with_outline.png"
 os.makedirs(os.path.dirname(output_plot), exist_ok=True)
