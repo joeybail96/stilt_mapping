@@ -5,6 +5,10 @@ import cartopy.feature as cfeature
 import numpy as np
 import os
 from matplotlib.path import Path
+from matplotlib.colors import ListedColormap
+import cartopy.io.shapereader as shpreader
+from cartopy.feature import ShapelyFeature
+from cartopy.io.shapereader import Reader, natural_earth
 
 # ==== Function to Compute Mean Within Outlines and BBox ====
 def compute_mean_within_regions(lon2d, lat2d, data2d, outlines, bbox):
@@ -67,19 +71,45 @@ lat = percent_ds['lat'].values
 lon2d, lat2d = np.meshgrid(lon, lat)
 
 # ==== Set up Plot ====
+crs_proj = ccrs.PlateCarree()
 fig = plt.figure(figsize=(8, 6))
 ax = plt.axes(projection=ccrs.PlateCarree())
 
 # Set extent based on data bounds
 ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
 
-# Add geographic features
-ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=0.5)
-ax.add_feature(cfeature.BORDERS.with_scale('50m'), linestyle=':', linewidth=0.5)
-ax.add_feature(cfeature.STATES.with_scale('50m'), linewidth=0.5)
+# Mask out Canada and Mexico
+shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
+reader = shpreader.Reader(shapefile)
+for record in reader.records():
+    if record.attributes['NAME'] in ['Mexico', 'Canada']:
+        geometry = record.geometry
+        feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
+        ax.add_feature(feature, zorder=3)
+
+# Optional: add geographic features for context
+# Add ocean and lakes with consistent colors
+ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+
+ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
+ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
+ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
+
+# Add high-quality water features on top
+ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
+ocean_geom = Reader(ocean_shp).geometries()
+ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
+ax.add_feature(ocean_feature, zorder=4)
+
+lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
+lakes_geom = Reader(lakes_shp).geometries()
+lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
+ax.add_feature(lakes_feature, zorder=4)
+
 
 # ==== Plot Percent Difference ====
-c = ax.pcolormesh(lon, lat, percent_change, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree())
+c = ax.pcolormesh(lon, lat, percent_change, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
 plt.colorbar(c, ax=ax, label='Percent Change (%)')
 
 # ==== Plot Outlines ====
@@ -88,13 +118,13 @@ outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
 for outline in outlines:
     outline = outline[~np.isnan(outline[:, 0])]
     if len(outline) > 1:
-        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree())
+        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
 
 # ==== Plot Bounding Box ====
 bbox = outline_ds['bounding_box'].values  # shape: (5, 2)
 if bbox.shape[0] == 5:
     bbox_closed = np.vstack([bbox, bbox[0]])  # Close loop for plotting
-    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box')
+    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
 
 
 # ==== Compute Mean and Mask ====
@@ -105,26 +135,50 @@ fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': ccrs.PlateCarre
 
 masked_values = np.where(mask_2d, percent_change.values, np.nan)
 
-pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree())
+pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
 
 # Draw black outlines around the trajectory outlines
 for outline in outlines:
     outline = outline[~np.isnan(outline[:, 0])]  # remove NaNs if any
     if len(outline) > 1:
-        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree())
+        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
 
 # Draw bounding box outline as well (red dashed line if you want, or black)
 if bbox.shape[0] == 5:
     bbox_closed = np.vstack([bbox, bbox[0]])  # close the loop
-    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree())
+    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), zorder=9)
     
 # Set the map extent to match your data bounds
 ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
 
+# Mask out Canada and Mexico
+shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
+reader = shpreader.Reader(shapefile)
+for record in reader.records():
+    if record.attributes['NAME'] in ['Mexico', 'Canada']:
+        geometry = record.geometry
+        feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
+        ax.add_feature(feature, zorder=3)
+
 # Optional: add geographic features for context
-ax.coastlines(resolution='50m', linewidth=0.5)
-ax.add_feature(cfeature.BORDERS.with_scale('50m'), linestyle=':', linewidth=0.5)
-ax.add_feature(cfeature.STATES.with_scale('50m'), linewidth=0.5)
+# Add ocean and lakes with consistent colors
+ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+
+ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
+ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
+ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
+
+# Add high-quality water features on top
+ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
+ocean_geom = Reader(ocean_shp).geometries()
+ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
+ax.add_feature(ocean_feature, zorder=4)
+
+lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
+lakes_geom = Reader(lakes_shp).geometries()
+lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
+ax.add_feature(lakes_feature, zorder=4)
 
 ax.set_title("Values Included in Regional Mean")
 plt.xlabel("Longitude")
