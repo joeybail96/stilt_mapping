@@ -5,7 +5,7 @@ import cartopy.feature as cfeature
 import numpy as np
 import os
 from matplotlib.path import Path
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import ListedColormap, BoundaryNorm
 import cartopy.io.shapereader as shpreader
 from cartopy.feature import ShapelyFeature
 from cartopy.io.shapereader import Reader, natural_earth
@@ -54,30 +54,43 @@ def compute_mean_within_regions(lon2d, lat2d, data2d, outlines, bbox):
 
 
 # ==== User Inputs ====
-percent_diff_nc = "aridity_data/percent_change_west.nc"
-#outline_nc = "../2025_trajectories/footprint_outlines/04022025_outline.nc"
-#output_plot = "figures/04022025_percent_change_with_outline.png"
-#os.makedirs(os.path.dirname(output_plot), exist_ok=True)
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2022_trajectories"
 
-input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories"
+# ==== Prompt User for Dataset to Plot ====
+choice = input("Which dataset would you like to plot? (percent/aridity): ").strip().lower()
 
-
+if choice == 'percent':
+    nc_file = "aridity_data/percent_change_west.nc"
+    var_name = 'percent_change'
+    color_label = 'Percent Change (%)'
+    cmap = 'RdBu'
+    vmin, vmax = -100, 100
+elif choice == 'aridity':
+    nc_file = "aridity_data/2025_west.nc"
+    var_name = 'VegDRI'
+    color_label = 'Aridity Index'
+    cmap = 'YlOrRd'
+    vmin, vmax = 0, 2  # adjust as appropriate for your data
+else:
+    raise ValueError("Invalid selection. Choose 'percent' or 'aridity'.")
 
 # ==== Load Datasets ====
 
 for folder in os.listdir(input_dir):
 
     outline_nc = glob(os.path.join(input_dir, folder, 'footprint_outlines', "*_outlines.nc"))
-    output_plot = f"figures/{folder}_percent_change_with_outline.png"
+    output_plot = f"figures/{folder}_{var_name}_with_outline.png"
     os.makedirs(os.path.dirname(output_plot), exist_ok=True)
 
-    percent_ds = xr.open_dataset(percent_diff_nc)
+    data_ds = xr.open_dataset(nc_file)
+    if choice == 'aridity':
+        data_ds = data_ds.mean(dim='time')
     outline_ds = xr.open_dataset(outline_nc[0])
     
     # Assume variable name is 'percent_change'
-    percent_change = percent_ds['percent_change']
-    lon = percent_ds['lon'].values
-    lat = percent_ds['lat'].values
+    data_var = data_ds[var_name]
+    lon = data_ds['lon'].values
+    lat = data_ds['lat'].values
     
     # Generate meshgrid for spatial masking
     lon2d, lat2d = np.meshgrid(lon, lat)
@@ -97,7 +110,7 @@ for folder in os.listdir(input_dir):
         if record.attributes['NAME'] in ['Mexico', 'Canada']:
             geometry = record.geometry
             feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
-            ax.add_feature(feature, zorder=3)
+            ax.add_feature(feature, zorder=10)
     
     # Optional: add geographic features for context
     # Add ocean and lakes with consistent colors
@@ -108,22 +121,26 @@ for folder in os.listdir(input_dir):
     ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
     ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
     
-    # Add high-quality water features on top
-    ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
-    ocean_geom = Reader(ocean_shp).geometries()
-    ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-    ax.add_feature(ocean_feature, zorder=4)
-    
-    lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
-    lakes_geom = Reader(lakes_shp).geometries()
-    lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-    ax.add_feature(lakes_feature, zorder=4)
-    
+   
     
     # ==== Plot Percent Difference ====
-    c = ax.pcolormesh(lon, lat, percent_change, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
-    plt.colorbar(c, ax=ax, label='Percent Change (%)')
+    if choice == 'percent':
+        c = ax.pcolormesh(lon, lat, data_var, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
+        plt.colorbar(c, ax=ax, label=f'{var_name}')
     
+    elif choice == 'aridity':
+        boundaries = [0, 64, 81, 97, 113, 161, 178, 193, 253, 254, 255, 256]
+        colors = [
+            '#800000', '#FF0000', '#FFA500', '#FFFF00', '#FFFFFF',
+            '#90EE90', '#008000', '#006400', '#00008B', '#D3D3D3', '#FFFFFF'
+        ]
+        cmap = ListedColormap(colors)
+        norm = BoundaryNorm(boundaries, ncolors=len(colors))   
+        c = ax.pcolormesh(lon, lat, data_var, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), zorder=9)
+        cbar = plt.colorbar(c, ax=ax, orientation='vertical', pad=0.05, boundaries=boundaries)
+        cbar.set_label(var_name)
+        cbar.set_ticks(boundaries[:-3])  
+        
     # ==== Plot Outlines ====
     outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
     
@@ -139,16 +156,43 @@ for folder in os.listdir(input_dir):
         ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
     
     
+    # Add high-quality water features on top
+    ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
+    ocean_geom = Reader(ocean_shp).geometries()
+    ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
+    ax.add_feature(ocean_feature, zorder=12)
+    
+    lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
+    lakes_geom = Reader(lakes_shp).geometries()
+    lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
+    ax.add_feature(lakes_feature, zorder=12)
+    
     # ==== Compute Mean and Mask ====
-    mean_within_region, mask_2d = compute_mean_within_regions(lon2d, lat2d, percent_change.values, outlines, bbox)
-    print(f"Average percent change within outlines and bounding box: {mean_within_region:.2f}%")
+    mean_within_region, mask_2d = compute_mean_within_regions(lon2d, lat2d, data_var.values, outlines, bbox)
+    print(f"Average {var_name} within outlines and bounding box: {mean_within_region:.2f}")
     
     fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': ccrs.PlateCarree()})
     
-    masked_values = np.where(mask_2d, percent_change.values, np.nan)
+    masked_values = np.where(mask_2d, data_var.values, np.nan)
     
-    pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
-    
+    if choice == 'percent':
+        pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
+        plt.colorbar(pc, ax=ax, label=f'{var_name}')
+        
+    elif choice == 'aridity':
+        boundaries = [0, 64, 81, 97, 113, 161, 178, 193, 253, 254, 255, 256]
+        colors = [
+            '#800000', '#FF0000', '#FFA500', '#FFFF00', '#FFFFFF',
+            '#90EE90', '#008000', '#006400', '#00008B', '#D3D3D3', '#FFFFFF'
+        ]
+        cmap = ListedColormap(colors)
+        norm = BoundaryNorm(boundaries, ncolors=len(colors))
+        
+        pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap=cmap, norm=norm, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
+        cbar = plt.colorbar(pc, ax=ax, orientation='vertical', pad=0.05, boundaries=boundaries)
+        cbar.set_label(var_name)
+        cbar.set_ticks(boundaries[:-3])  
+        
     # Draw black outlines around the trajectory outlines
     for outline in outlines:
         outline = outline[~np.isnan(outline[:, 0])]  # remove NaNs if any
@@ -170,7 +214,7 @@ for folder in os.listdir(input_dir):
         if record.attributes['NAME'] in ['Mexico', 'Canada']:
             geometry = record.geometry
             feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
-            ax.add_feature(feature, zorder=3)
+            ax.add_feature(feature, zorder=10)
     
     # Optional: add geographic features for context
     # Add ocean and lakes with consistent colors
@@ -185,29 +229,29 @@ for folder in os.listdir(input_dir):
     ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
     ocean_geom = Reader(ocean_shp).geometries()
     ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-    ax.add_feature(ocean_feature, zorder=4)
+    ax.add_feature(ocean_feature, zorder=12)
     
     lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
     lakes_geom = Reader(lakes_shp).geometries()
     lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-    ax.add_feature(lakes_feature, zorder=4)
+    ax.add_feature(lakes_feature, zorder=12)
     
     ax.set_title("Values Included in Regional Mean")
     plt.xlabel("Longitude")
     plt.ylabel("Latitude")
-    plt.colorbar(pc, ax=ax, label='Percent Change (%)')
+    
     
     masked_plot = output_plot.replace('.png', '_masked.png')
     plt.savefig(masked_plot, dpi=300, bbox_inches='tight')
     plt.close()
     
-    print("Masked percent change plot saved to: figures/percent_change_within_region.png")
+    print(f"Masked {var_name} plot saved to: figures/{var_name}_with_outline_masked.png")
     
     
     
     
     # ==== Save Figure ====
-    plt.title(f"Percent Change with STILT Footprint Outlines\nMean = {mean_within_region:.2f}%")
+    plt.title(f"Mean = {mean_within_region:.2f}")
     plt.savefig(output_plot, dpi=300, bbox_inches='tight')
     plt.close()
     
