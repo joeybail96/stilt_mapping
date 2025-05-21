@@ -9,6 +9,7 @@ from matplotlib.colors import ListedColormap
 import cartopy.io.shapereader as shpreader
 from cartopy.feature import ShapelyFeature
 from cartopy.io.shapereader import Reader, natural_earth
+from glob import glob
 
 # ==== Function to Compute Mean Within Outlines and BBox ====
 def compute_mean_within_regions(lon2d, lat2d, data2d, outlines, bbox):
@@ -54,148 +55,160 @@ def compute_mean_within_regions(lon2d, lat2d, data2d, outlines, bbox):
 
 # ==== User Inputs ====
 percent_diff_nc = "aridity_data/percent_change_west.nc"
-outline_nc = "../2025_trajectories/footprint_outlines/04022025_outline.nc"
-output_plot = "figures/04022025_percent_change_with_outline.png"
-os.makedirs(os.path.dirname(output_plot), exist_ok=True)
+#outline_nc = "../2025_trajectories/footprint_outlines/04022025_outline.nc"
+#output_plot = "figures/04022025_percent_change_with_outline.png"
+#os.makedirs(os.path.dirname(output_plot), exist_ok=True)
+
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories"
+
+
 
 # ==== Load Datasets ====
-percent_ds = xr.open_dataset(percent_diff_nc)
-outline_ds = xr.open_dataset(outline_nc)
 
-# Assume variable name is 'percent_change'
-percent_change = percent_ds['percent_change']
-lon = percent_ds['lon'].values
-lat = percent_ds['lat'].values
+for folder in os.listdir(input_dir):
 
-# Generate meshgrid for spatial masking
-lon2d, lat2d = np.meshgrid(lon, lat)
+    outline_nc = glob(os.path.join(input_dir, folder, 'footprint_outlines', "*_outlines.nc"))
+    output_plot = f"figures/{folder}_percent_change_with_outline.png"
+    os.makedirs(os.path.dirname(output_plot), exist_ok=True)
 
-# ==== Set up Plot ====
-crs_proj = ccrs.PlateCarree()
-fig = plt.figure(figsize=(8, 6))
-ax = plt.axes(projection=ccrs.PlateCarree())
-
-# Set extent based on data bounds
-ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
-
-# Mask out Canada and Mexico
-shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
-reader = shpreader.Reader(shapefile)
-for record in reader.records():
-    if record.attributes['NAME'] in ['Mexico', 'Canada']:
-        geometry = record.geometry
-        feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
-        ax.add_feature(feature, zorder=3)
-
-# Optional: add geographic features for context
-# Add ocean and lakes with consistent colors
-ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
-ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
-
-ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
-ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
-ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
-
-# Add high-quality water features on top
-ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
-ocean_geom = Reader(ocean_shp).geometries()
-ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-ax.add_feature(ocean_feature, zorder=4)
-
-lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
-lakes_geom = Reader(lakes_shp).geometries()
-lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-ax.add_feature(lakes_feature, zorder=4)
-
-
-# ==== Plot Percent Difference ====
-c = ax.pcolormesh(lon, lat, percent_change, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
-plt.colorbar(c, ax=ax, label='Percent Change (%)')
-
-# ==== Plot Outlines ====
-outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
-
-for outline in outlines:
-    outline = outline[~np.isnan(outline[:, 0])]
-    if len(outline) > 1:
-        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
-
-# ==== Plot Bounding Box ====
-bbox = outline_ds['bounding_box'].values  # shape: (5, 2)
-if bbox.shape[0] == 5:
-    bbox_closed = np.vstack([bbox, bbox[0]])  # Close loop for plotting
-    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
-
-
-# ==== Compute Mean and Mask ====
-mean_within_region, mask_2d = compute_mean_within_regions(lon2d, lat2d, percent_change.values, outlines, bbox)
-print(f"Average percent change within outlines and bounding box: {mean_within_region:.2f}%")
-
-fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': ccrs.PlateCarree()})
-
-masked_values = np.where(mask_2d, percent_change.values, np.nan)
-
-pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
-
-# Draw black outlines around the trajectory outlines
-for outline in outlines:
-    outline = outline[~np.isnan(outline[:, 0])]  # remove NaNs if any
-    if len(outline) > 1:
-        ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
-
-# Draw bounding box outline as well (red dashed line if you want, or black)
-if bbox.shape[0] == 5:
-    bbox_closed = np.vstack([bbox, bbox[0]])  # close the loop
-    ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), zorder=9)
+    percent_ds = xr.open_dataset(percent_diff_nc)
+    outline_ds = xr.open_dataset(outline_nc[0])
     
-# Set the map extent to match your data bounds
-ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
-
-# Mask out Canada and Mexico
-shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
-reader = shpreader.Reader(shapefile)
-for record in reader.records():
-    if record.attributes['NAME'] in ['Mexico', 'Canada']:
-        geometry = record.geometry
-        feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
-        ax.add_feature(feature, zorder=3)
-
-# Optional: add geographic features for context
-# Add ocean and lakes with consistent colors
-ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
-ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
-
-ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
-ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
-ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
-
-# Add high-quality water features on top
-ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
-ocean_geom = Reader(ocean_shp).geometries()
-ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-ax.add_feature(ocean_feature, zorder=4)
-
-lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
-lakes_geom = Reader(lakes_shp).geometries()
-lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-ax.add_feature(lakes_feature, zorder=4)
-
-ax.set_title("Values Included in Regional Mean")
-plt.xlabel("Longitude")
-plt.ylabel("Latitude")
-plt.colorbar(pc, ax=ax, label='Percent Change (%)')
-
-plt.savefig("figures/percent_change_within_region.png", dpi=300, bbox_inches='tight')
-plt.close()
-
-print("Masked percent change plot saved to: figures/percent_change_within_region.png")
-
-
-
-
-# ==== Save Figure ====
-plt.title(f"Percent Change with STILT Footprint Outlines\nMean = {mean_within_region:.2f}%")
-plt.savefig(output_plot, dpi=300, bbox_inches='tight')
-plt.close()
-
-print(f"Plot saved to: {output_plot}")
+    # Assume variable name is 'percent_change'
+    percent_change = percent_ds['percent_change']
+    lon = percent_ds['lon'].values
+    lat = percent_ds['lat'].values
+    
+    # Generate meshgrid for spatial masking
+    lon2d, lat2d = np.meshgrid(lon, lat)
+    
+    # ==== Set up Plot ====
+    crs_proj = ccrs.PlateCarree()
+    fig = plt.figure(figsize=(8, 6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    
+    # Set extent based on data bounds
+    ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
+    
+    # Mask out Canada and Mexico
+    shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
+    reader = shpreader.Reader(shapefile)
+    for record in reader.records():
+        if record.attributes['NAME'] in ['Mexico', 'Canada']:
+            geometry = record.geometry
+            feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
+            ax.add_feature(feature, zorder=3)
+    
+    # Optional: add geographic features for context
+    # Add ocean and lakes with consistent colors
+    ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+    ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+    
+    ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
+    ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
+    ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
+    
+    # Add high-quality water features on top
+    ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
+    ocean_geom = Reader(ocean_shp).geometries()
+    ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
+    ax.add_feature(ocean_feature, zorder=4)
+    
+    lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
+    lakes_geom = Reader(lakes_shp).geometries()
+    lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
+    ax.add_feature(lakes_feature, zorder=4)
+    
+    
+    # ==== Plot Percent Difference ====
+    c = ax.pcolormesh(lon, lat, percent_change, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
+    plt.colorbar(c, ax=ax, label='Percent Change (%)')
+    
+    # ==== Plot Outlines ====
+    outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
+    
+    for outline in outlines:
+        outline = outline[~np.isnan(outline[:, 0])]
+        if len(outline) > 1:
+            ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
+    
+    # ==== Plot Bounding Box ====
+    bbox = outline_ds['bounding_box'].values  # shape: (5, 2)
+    if bbox.shape[0] == 5:
+        bbox_closed = np.vstack([bbox, bbox[0]])  # Close loop for plotting
+        ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
+    
+    
+    # ==== Compute Mean and Mask ====
+    mean_within_region, mask_2d = compute_mean_within_regions(lon2d, lat2d, percent_change.values, outlines, bbox)
+    print(f"Average percent change within outlines and bounding box: {mean_within_region:.2f}%")
+    
+    fig, ax = plt.subplots(figsize=(8, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    
+    masked_values = np.where(mask_2d, percent_change.values, np.nan)
+    
+    pc = ax.pcolormesh(lon2d, lat2d, masked_values, cmap='RdBu', vmin=-100, vmax=100, shading='auto', transform=ccrs.PlateCarree(), zorder=9)
+    
+    # Draw black outlines around the trajectory outlines
+    for outline in outlines:
+        outline = outline[~np.isnan(outline[:, 0])]  # remove NaNs if any
+        if len(outline) > 1:
+            ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
+    
+    # Draw bounding box outline as well (red dashed line if you want, or black)
+    if bbox.shape[0] == 5:
+        bbox_closed = np.vstack([bbox, bbox[0]])  # close the loop
+        ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), zorder=9)
+        
+    # Set the map extent to match your data bounds
+    ax.set_extent([lon.min(), lon.max(), lat.min(), lat.max()], crs=ccrs.PlateCarree())
+    
+    # Mask out Canada and Mexico
+    shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name='admin_0_countries')
+    reader = shpreader.Reader(shapefile)
+    for record in reader.records():
+        if record.attributes['NAME'] in ['Mexico', 'Canada']:
+            geometry = record.geometry
+            feature = ShapelyFeature([geometry], crs=crs_proj, facecolor='gray', edgecolor='none')
+            ax.add_feature(feature, zorder=3)
+    
+    # Optional: add geographic features for context
+    # Add ocean and lakes with consistent colors
+    ax.add_feature(cfeature.OCEAN.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+    ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
+    
+    ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
+    ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
+    ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
+    
+    # Add high-quality water features on top
+    ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
+    ocean_geom = Reader(ocean_shp).geometries()
+    ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
+    ax.add_feature(ocean_feature, zorder=4)
+    
+    lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
+    lakes_geom = Reader(lakes_shp).geometries()
+    lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
+    ax.add_feature(lakes_feature, zorder=4)
+    
+    ax.set_title("Values Included in Regional Mean")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.colorbar(pc, ax=ax, label='Percent Change (%)')
+    
+    masked_plot = output_plot.replace('.png', '_masked.png')
+    plt.savefig(masked_plot, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print("Masked percent change plot saved to: figures/percent_change_within_region.png")
+    
+    
+    
+    
+    # ==== Save Figure ====
+    plt.title(f"Percent Change with STILT Footprint Outlines\nMean = {mean_within_region:.2f}%")
+    plt.savefig(output_plot, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Plot saved to: {output_plot}")

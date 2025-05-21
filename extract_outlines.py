@@ -8,7 +8,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from glob import glob
 
-input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories"
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2022_trajectories"
 
 
 # Main loop
@@ -102,7 +102,10 @@ for folder in os.listdir(input_dir):
         )
     })
 
-    output_path = os.path.join(input_dir, folder, f'footprint_outlines/{folder}_outlines.nc')
+    output_dir = os.path.join(input_dir, folder, 'footprint_outlines')
+    os.makedirs(output_dir, exist_ok=True)  # Create directory if it doesn't exist
+    output_path = os.path.join(output_dir, f'{folder}_outlines.nc')
+    
     outline_ds.to_netcdf(output_path)
     print(f"Saved outline and bounding box NetCDF to: {output_path}")
 

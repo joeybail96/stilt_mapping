@@ -5,26 +5,19 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from datetime import datetime, timedelta
+from glob import glob
 
-# Define times and file names
-t_start = ['2025-02-04 18:00:00']
-t_end = ['2025-02-05 18:00:00']
-names = ['04022025.png']
 
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2022_trajectories"
 # Output directory
-output_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/scripts/figures"
+output_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/scripts/figures/raw_footprints"
+
 
 # Main loop
-for i in range(len(t_start)):
-    print(f"Processing event {i + 1}...")
+for folder in os.listdir(input_dir):
+    print(f"Processing event {folder}...")
 
-    # Create time range (UTC + 7 hours)
-    run_times = [datetime.strptime(t_start[i], "%Y-%m-%d %H:%M:%S") + timedelta(hours=7) + timedelta(hours=h)
-                 for h in range(int((datetime.strptime(t_end[i], "%Y-%m-%d %H:%M:%S") -
-                                     datetime.strptime(t_start[i], "%Y-%m-%d %H:%M:%S")).total_seconds() / 3600) + 1)]
-
-    run_times = [dt.strftime("%Y%m%d%H%M") for dt in run_times]
-    filepaths = [f"/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories/footprints/{rt}_-106.744_40.455_5_foot.nc" for rt in run_times]
+    filepaths = sorted(glob(os.path.join(input_dir, folder, 'footprints', "*_foot.nc")))
 
     before_files = filepaths[:4]
     after_files = filepaths[-4:]
@@ -78,6 +71,6 @@ for i in range(len(t_start)):
     cbar.set_label("log10(Footprint)")
 
     # Save plot
-    output_file = os.path.join(output_dir, names[i])
+    output_file = os.path.join(output_dir, folder)
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
