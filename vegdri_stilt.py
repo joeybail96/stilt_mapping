@@ -144,4 +144,11 @@ for folder in os.listdir(input_dir):
     
 
         
+
     
+    
+    # ==== Save Figure ====
+    plt.savefig(output_plot, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Plot saved to: {output_plot}")
