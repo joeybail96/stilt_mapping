@@ -182,20 +182,8 @@ for folder in os.listdir(input_dir):
         bbox_closed = np.vstack([bbox, bbox[0]])  # Close loop for plotting
         ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
     
-    
-    # # add high-quality water features on top
-    # ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
-    # ocean_geom = Reader(ocean_shp).geometries()
-    # ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-    # ax.add_feature(ocean_feature, zorder=12)
-    
-    # lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
-    # lakes_geom = Reader(lakes_shp).geometries()
-    # lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-    # ax.add_feature(lakes_feature, zorder=12)
-    
-    
-    
+
+        
     # ==== compute mean and mask ====
     # this code doesn't always work. Might need to scorch this and start over
     mean_within_region, mask_2d = compute_mean_within_regions(lon2d, lat2d, data_var.values, outlines, bbox)
