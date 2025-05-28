@@ -10,6 +10,7 @@ import cartopy.io.shapereader as shpreader
 from cartopy.feature import ShapelyFeature
 from cartopy.io.shapereader import Reader, natural_earth
 from glob import glob
+from scipy.ndimage import gaussian_filter
 
 
 
@@ -135,12 +136,42 @@ for folder in os.listdir(input_dir):
         except Exception as e:
             print(f"Failed to draw vegdri outline: {e}")
         
+        
+        
     # ==== plot outlines ====
-    outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
-    for outline in outlines:
-        outline = outline[~np.isnan(outline[:, 0])]
-        if len(outline) > 1:
-            ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
+    # outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
+    # for outline in outlines:
+    #     outline = outline[~np.isnan(outline[:, 0])]
+    #     if len(outline) > 1:
+    #         ax.plot(outline[:, 0], outline[:, 1], color='black', linewidth=1.0, transform=ccrs.PlateCarree(), zorder=9)
+    
+    
+    folder_path = os.path.join(input_dir, folder)
+    during_nc_path = os.path.join(folder_path, "footprints", "during.nc")
+    if not os.path.exists(during_nc_path):
+        print(f"Skipping {folder}: during.nc not found")
+        continue
+
+    print(f"Processing {folder}...")
+
+    ds = xr.open_dataset(during_nc_path)
+    foot = ds['foot']
+
+    log_data = np.where(foot > 0, np.log10(foot), np.nan)
+    log_data = np.where(log_data < -10, np.nan, log_data)
+    log_data_smoothed = gaussian_filter(np.nan_to_num(log_data, nan=np.nanmin(log_data)), sigma=2)
+    
+    levels = [-8, -7, -6, -5, -4, -3, -2, -1]
+
+    contours = ax.contour(
+        foot['lon'], foot['lat'], log_data_smoothed,
+        levels=levels,
+        colors='black',
+        linewidths=1.5,
+        linestyles='solid',
+        transform=ccrs.PlateCarree(),
+        zorder = 9
+    )
     
     
     
