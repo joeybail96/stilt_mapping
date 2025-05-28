@@ -109,7 +109,7 @@ for folder in os.listdir(input_dir):
     
     # ==== plot percent difference or aridity map based on choice ====
     if choice == 'percent':
-        c = ax.pcolormesh(lon, lat, data_var, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=9)
+        c = ax.pcolormesh(lon, lat, data_var, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=2)
         plt.colorbar(c, ax=ax, label=f'{var_name}')
     
     elif choice == 'aridity':
@@ -121,7 +121,7 @@ for folder in os.listdir(input_dir):
         cmap = ListedColormap(colors)
         cmap.set_bad(color='#FFFFFF')
         norm = BoundaryNorm(boundaries, ncolors=len(colors))   
-        c = ax.pcolormesh(lon, lat, data_var, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), zorder=9)
+        c = ax.pcolormesh(lon, lat, data_var, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), zorder=2)
         cbar = plt.colorbar(c, ax=ax, orientation='vertical', pad=0.05, boundaries=boundaries)
         cbar.set_label(var_name)
         cbar.set_ticks(boundaries[:-3])  
