@@ -91,19 +91,19 @@ for folder in os.listdir(input_dir):
     ax.add_feature(cfeature.LAKES.with_scale('10m'), facecolor='#3b9b9b', zorder=1)
     
     # add border information
-    ax.add_feature(cfeature.BORDERS, linewidth=1, zorder=4)
-    ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.5, edgecolor='black', zorder=4)
-    ax.coastlines(resolution='10m', linewidth=0.5, zorder=4)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.5, zorder=4)
+    ax.add_feature(cfeature.STATES.with_scale('10m'), linewidth=0.25, alpha=0.3, linestyle='--', edgecolor='black', zorder=4)
+    ax.coastlines(resolution='10m', linewidth=0.25, zorder=4)
     
     # add high-quality water features on top
     ocean_shp = natural_earth(resolution='10m', category='physical', name='ocean')
     ocean_geom = Reader(ocean_shp).geometries()
     ocean_feature = ShapelyFeature(ocean_geom, crs_proj, facecolor='#3b9b9b', edgecolor='none')
-    ax.add_feature(ocean_feature, zorder=12)
+    ax.add_feature(ocean_feature, linewidth=0.25, zorder=12)
     lakes_shp = natural_earth(resolution='10m', category='physical', name='lakes')
     lakes_geom = Reader(lakes_shp).geometries()
     lakes_feature = ShapelyFeature(lakes_geom, crs_proj, facecolor='#3b9b9b', edgecolor='black')
-    ax.add_feature(lakes_feature, zorder=12)
+    ax.add_feature(lakes_feature, linewidth=0.25, zorder=12)
     
    
     
@@ -115,17 +115,25 @@ for folder in os.listdir(input_dir):
     elif choice == 'aridity':
         boundaries = [0, 64, 81, 97, 113, 161, 178, 193, 253, 254, 255, 256]
         colors = [
-            '#800000', '#FF0000', '#FFA500', '#FFFF00', '#FFFFFF',
+            '#800000', '#FF0000', '#FFA500', '#FFFF00', '#ADD8E6',
             '#90EE90', '#008000', '#006400', '#00008B', '#D3D3D3', '#FFFFFF'
         ]
         cmap = ListedColormap(colors)
+        cmap.set_bad(color='#FFFFFF')
         norm = BoundaryNorm(boundaries, ncolors=len(colors))   
         c = ax.pcolormesh(lon, lat, data_var, cmap=cmap, norm=norm, transform=ccrs.PlateCarree(), zorder=9)
         cbar = plt.colorbar(c, ax=ax, orientation='vertical', pad=0.05, boundaries=boundaries)
         cbar.set_label(var_name)
         cbar.set_ticks(boundaries[:-3])  
         
-        
+        try:
+            mask = np.ma.masked_invalid(data_var)
+            outline = ax.contour(
+                lon, lat, mask.mask.astype(int), levels=[0.5],
+                colors='black', linewidths=0.25, transform=crs_proj, zorder=3.5
+            )
+        except Exception as e:
+            print(f"Failed to draw vegdri outline: {e}")
         
     # ==== plot outlines ====
     outlines = outline_ds['outlines'].values  # shape: (n_outlines, n_points, 2)
