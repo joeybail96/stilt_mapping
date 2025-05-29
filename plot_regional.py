@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from glob import glob
 
 
-input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2022_trajectories"
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories"
 # Output directory
 output_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/scripts/figures/raw_footprints"
 
@@ -39,6 +39,10 @@ for folder in os.listdir(input_dir):
     before = average_footprints(before_files)
     during = average_footprints(during_files)
     after = average_footprints(after_files)
+    
+    during_save = os.path.join(input_dir, folder, 'footprints',"during.nc")
+    during.to_netcdf(during_save)
+    
 
     def plot_footprint(ax, data, title, vmax):
         if data is None:
