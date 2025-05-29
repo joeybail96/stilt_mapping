@@ -15,7 +15,7 @@ from scipy.ndimage import gaussian_filter
 
 
 # ==== User Inputs ====
-input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2025_trajectories"
+input_dir = "/uufs/chpc.utah.edu/common/home/hallar-group2/climatology/stilt/dust_spl/out/2022_trajectories"
 
 # prompt user for which dataset to plot
 choice = input("Which dataset would you like to plot? (percent/aridity): ").strip().lower()
@@ -55,7 +55,7 @@ for folder in os.listdir(input_dir):
         data_ds = data_ds.mean(dim='time')
         
     # open the outline nc file
-    outline_ds = xr.open_dataset(outline_nc[0])
+    #outline_ds = xr.open_dataset(outline_nc[0])
     
     # pull out variables, lon, and lat values of aridity or % diff data
     data_var = data_ds[var_name]
@@ -112,6 +112,15 @@ for folder in os.listdir(input_dir):
     if choice == 'percent':
         c = ax.pcolormesh(lon, lat, data_var, cmap='RdBu', vmin=-100, vmax=100, transform=ccrs.PlateCarree(), zorder=2)
         plt.colorbar(c, ax=ax, label=f'{var_name}')
+        
+        try:
+            mask = np.ma.masked_invalid(data_var)
+            outline = ax.contour(
+                lon, lat, mask.mask.astype(int), levels=[0.5],
+                colors='black', linewidths=0.25, transform=crs_proj, zorder=3.5
+            )
+        except Exception as e:
+            print(f"Failed to draw vegdri outline: {e}")
     
     elif choice == 'aridity':
         boundaries = [0, 64, 81, 97, 113, 161, 178, 193, 253, 254, 255, 256]
@@ -159,32 +168,26 @@ for folder in os.listdir(input_dir):
 
     log_data = np.where(foot > 0, np.log10(foot), np.nan)
     log_data = np.where(log_data < -10, np.nan, log_data)
-    log_data_smoothed = gaussian_filter(np.nan_to_num(log_data, nan=np.nanmin(log_data)), sigma=2)
+    log_data_smoothed = gaussian_filter(np.nan_to_num(log_data, nan=np.nanmin(log_data)), sigma=3)
     
-    levels = [-8, -7, -6, -5, -4, -3, -2, -1]
+    levels = [-8, -6, -4, -2]
 
     contours = ax.contour(
         foot['lon'], foot['lat'], log_data_smoothed,
         levels=levels,
         colors='black',
-        linewidths=1.5,
+        linewidths=1,
         linestyles='solid',
         transform=ccrs.PlateCarree(),
         zorder = 9
     )
     
     
-    
-    # ==== plot bounding box ====
-    bbox = outline_ds['bounding_box'].values  # shape: (5, 2)
-    if bbox.shape[0] == 5:
-        bbox_closed = np.vstack([bbox, bbox[0]])  # Close loop for plotting
-        ax.plot(bbox_closed[:, 0], bbox_closed[:, 1], color='black', linewidth=0.5, linestyle='--', transform=ccrs.PlateCarree(), label='Bounding Box', zorder=9)
-    
+    # Add a marker at 40.455111°N, -106.74428°W
+    ax.plot(-106.74428, 40.455111, marker='o', color='blue', markersize=6,
+            transform=ccrs.PlateCarree(), label='Target Location', zorder=15)
 
-        
 
-    
     
     # ==== Save Figure ====
     plt.savefig(output_plot, dpi=300, bbox_inches='tight')
